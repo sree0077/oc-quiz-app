@@ -26,7 +26,6 @@
     "react-native-vector-icons": "^10.0.3",
     "@react-native-async-storage/async-storage": "^1.21.0",
     "react-native-vision-camera": "^3.8.2",
-    "vision-camera-ocr": "^2.0.0",
     "react-native-document-picker": "^9.1.1",
     "react-native-fs": "^2.20.0",
     "xlsx": "^0.18.5",
