@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1009743859834",
+    "project_id": "oc-quiz-76ede",
+    "storage_bucket": "oc-quiz-76ede.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1009743859834:android:faee41ba229656e12e2bc3",
+        "android_client_info": {
+          "package_name": "com.code.OC"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCL3R-0roI9nf9d2ODd0NTq2kB3nbWRRpI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
