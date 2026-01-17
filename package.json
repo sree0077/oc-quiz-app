@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "postinstall": "cd node_modules && ln -sf react-native-worklets-core react-native-worklets || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
