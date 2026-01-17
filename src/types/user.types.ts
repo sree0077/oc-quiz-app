@@ -5,8 +5,9 @@ export interface User {
   email: string;
   displayName: string;
   role: UserRole;
+  totalScore: number;
   createdAt: Date;
-  lastLogin: Date;
+  lastLogin?: Date;
   profileImage?: string;
 }
 
