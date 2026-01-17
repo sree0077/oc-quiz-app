@@ -1,5 +1,12 @@
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
+import { auth, db } from '../../config/firebase.config';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { User, LoginCredentials, RegisterData } from '../../types/user.types';
 import { COLLECTIONS } from '../../config/firebase.config';
 
@@ -10,13 +17,14 @@ class AuthService {
   async register(data: RegisterData): Promise<User> {
     try {
       // Create Firebase Auth user
-      const userCredential = await auth().createUserWithEmailAndPassword(
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
         data.email,
         data.password
       );
 
       // Update display name
-      await userCredential.user.updateProfile({
+      await updateProfile(userCredential.user, {
         displayName: data.displayName,
       });
 
@@ -26,18 +34,12 @@ class AuthService {
         email: data.email,
         displayName: data.displayName,
         role: data.role,
+        totalScore: 0,
         createdAt: new Date(),
         lastLogin: new Date(),
       };
 
-      await firestore()
-        .collection(COLLECTIONS.USERS)
-        .doc(userCredential.user.uid)
-        .set({
-          ...userData,
-          createdAt: firestore.FieldValue.serverTimestamp(),
-          lastLogin: firestore.FieldValue.serverTimestamp(),
-        });
+      await setDoc(doc(db, COLLECTIONS.USERS, userCredential.user.uid), userData);
 
       return userData;
     } catch (error: any) {
@@ -50,26 +52,21 @@ class AuthService {
    */
   async login(credentials: LoginCredentials): Promise<User> {
     try {
-      const userCredential = await auth().signInWithEmailAndPassword(
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
         credentials.email,
         credentials.password
       );
 
       // Update last login
-      await firestore()
-        .collection(COLLECTIONS.USERS)
-        .doc(userCredential.user.uid)
-        .update({
-          lastLogin: firestore.FieldValue.serverTimestamp(),
-        });
+      await updateDoc(doc(db, COLLECTIONS.USERS, userCredential.user.uid), {
+        lastLogin: new Date(),
+      });
 
       // Fetch user data
-      const userDoc = await firestore()
-        .collection(COLLECTIONS.USERS)
-        .doc(userCredential.user.uid)
-        .get();
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userCredential.user.uid));
 
-      if (!userDoc.exists) {
+      if (!userDoc.exists()) {
         throw new Error('User data not found');
       }
 
@@ -89,7 +86,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      await auth().signOut();
+      await signOut(auth);
     } catch (error: any) {
       throw new Error('Failed to logout');
     }
@@ -100,15 +97,12 @@ class AuthService {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      const currentUser = auth().currentUser;
+      const currentUser = auth.currentUser;
       if (!currentUser) return null;
 
-      const userDoc = await firestore()
-        .collection(COLLECTIONS.USERS)
-        .doc(currentUser.uid)
-        .get();
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, currentUser.uid));
 
-      if (!userDoc.exists) return null;
+      if (!userDoc.exists()) return null;
 
       const userData = userDoc.data() as User;
       return userData;
@@ -123,7 +117,7 @@ class AuthService {
    */
   async resetPassword(email: string): Promise<void> {
     try {
-      await auth().sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
       throw new Error(this.handleAuthError(error));
     }

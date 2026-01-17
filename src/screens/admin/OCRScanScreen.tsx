@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Button, Text, Card, ActivityIndicator, Chip } from 'react-native-paper';
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import ocrService from '../../services/ocr.service';
 import { useAuthStore } from '../../store/authStore';
 import { useSubjectStore } from '../../store/subjectStore';
@@ -9,46 +9,40 @@ import { useSubjectStore } from '../../store/subjectStore';
 export const OCRScanScreen: React.FC = () => {
   const { user } = useAuthStore();
   const { selectedSubject } = useSubjectStore();
-  
-  const [hasPermission, setHasPermission] = useState(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedQuestions, setScannedQuestions] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice('back');
+
+  const cameraRef = useRef<CameraView>(null);
 
   // Request camera permission on mount
   React.useEffect(() => {
-    requestPermission();
-  }, []);
-
-  const requestPermission = async () => {
-    const granted = await ocrService.requestCameraPermission();
-    setHasPermission(granted);
-    if (!granted) {
-      Alert.alert(
-        'Permission Required',
-        'Camera permission is required to scan questions'
-      );
+    if (!permission?.granted) {
+      requestPermission();
     }
-  };
+  }, []);
 
   const handleCapture = async () => {
     if (!cameraRef.current || !selectedSubject || !user) return;
 
     try {
       setIsProcessing(true);
-      
+
       // Capture photo
-      const photo = await cameraRef.current.takePhoto({
-        flash: 'off',
-        qualityPrioritization: 'quality',
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 1,
+        base64: true,
       });
+
+      if (!photo) {
+        throw new Error('Failed to capture photo');
+      }
 
       // Process with OCR
       const questions = await ocrService.processQuestionScan(
-        photo.path,
+        photo.uri,
         selectedSubject.subjectId,
         user.userId
       );
@@ -109,7 +103,15 @@ export const OCRScanScreen: React.FC = () => {
     }
   };
 
-  if (!hasPermission) {
+  if (!permission) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
         <Text>Camera permission is required</Text>
@@ -118,24 +120,13 @@ export const OCRScanScreen: React.FC = () => {
     );
   }
 
-  if (!device) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-        <Text>Loading camera...</Text>
-      </View>
-    );
-  }
-
   if (isScanning) {
     return (
       <View style={styles.container}>
-        <Camera
+        <CameraView
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={true}
-          photo={true}
+          facing="back"
         />
         
         <View style={styles.overlay}>

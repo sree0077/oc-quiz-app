@@ -1,6 +1,6 @@
-import XLSX from 'xlsx';
-import RNFS from 'react-native-fs';
-import DocumentPicker from 'react-native-document-picker';
+import * as XLSX from 'xlsx';
+import * as FileSystem from 'expo-file-system';
+import * as DocumentPicker from 'expo-document-picker';
 import { Question, AnswerOption, Difficulty } from '../types/quiz.types';
 
 interface ExcelQuestionRow {
@@ -33,24 +33,26 @@ class ExcelService {
    */
   async pickExcelFile(): Promise<string | null> {
     try {
-      const result = await DocumentPicker.pick({
+      const result = await DocumentPicker.getDocumentAsync({
         type: [
-          DocumentPicker.types.xlsx,
-          DocumentPicker.types.xls,
-          DocumentPicker.types.csv,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+          'application/vnd.ms-excel', // .xls
+          'text/csv', // .csv
         ],
+        copyToCacheDirectory: true,
       });
 
-      if (result && result[0]) {
-        return result[0].uri;
+      if (result.canceled) {
+        return null;
+      }
+
+      if (result.assets && result.assets[0]) {
+        return result.assets[0].uri;
       }
       return null;
     } catch (error) {
-      if (DocumentPicker.isCancel(error)) {
-        return null;
-      }
       console.error('Error picking file:', error);
-      throw new Error('Failed to pick file');
+      return null;
     }
   }
 
@@ -59,19 +61,21 @@ class ExcelService {
    */
   async parseExcelFile(filePath: string): Promise<ParseResult> {
     try {
-      // Read file content
-      const fileContent = await RNFS.readFile(filePath, 'base64');
-      
+      // Read file content as base64
+      const fileContent = await FileSystem.readAsStringAsync(filePath, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
       // Parse Excel file
       const workbook = XLSX.read(fileContent, { type: 'base64' });
-      
+
       // Get first sheet
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      
+
       // Convert to JSON
       const jsonData: ExcelQuestionRow[] = XLSX.utils.sheet_to_json(worksheet);
-      
+
       // Parse and validate questions
       return this.validateAndParseQuestions(jsonData);
     } catch (error) {

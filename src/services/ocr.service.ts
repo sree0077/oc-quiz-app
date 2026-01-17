@@ -1,6 +1,5 @@
-import { Camera } from 'react-native-vision-camera';
-import { OCRFrame, scanOCR } from 'vision-camera-ocr';
-import storage from '@react-native-firebase/storage';
+import { storage } from '../config/firebase.config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Question, AnswerOption } from '../types/quiz.types';
 import { STORAGE_PATHS } from '../config/firebase.config';
 
@@ -22,31 +21,30 @@ interface ParsedQuestion {
 
 class OCRService {
   /**
-   * Request camera permissions
-   */
-  async requestCameraPermission(): Promise<boolean> {
-    try {
-      const permission = await Camera.requestCameraPermission();
-      return permission === 'granted';
-    } catch (error) {
-      console.error('Error requesting camera permission:', error);
-      return false;
-    }
-  }
-
-  /**
    * Scan image and extract text using OCR
+   * Note: This is a placeholder. For production, integrate with:
+   * - Google Cloud Vision API
+   * - AWS Textract
+   * - Azure Computer Vision
+   * - Or use expo-image-manipulator with a third-party OCR service
    */
   async scanImage(imagePath: string): Promise<OCRResult> {
     try {
-      // Note: This is a simplified version. In production, you'd process the frame
-      // The actual implementation depends on vision-camera-ocr setup
-      
-      // For now, returning a mock structure
-      // In real implementation, you'd use the OCR plugin to scan the image
+      // TODO: Implement actual OCR using a cloud service
+      // For now, returning a mock structure for development
+
+      console.log('OCR scanning image:', imagePath);
+
+      // Mock result - replace with actual OCR API call
       const result: OCRResult = {
-        fullText: '',
-        blocks: [],
+        fullText: 'Sample question text from OCR\n(A) Option A\n(B) Option B\n(C) Option C\n(D) Option D',
+        blocks: [
+          'Sample question text from OCR',
+          '(A) Option A',
+          '(B) Option B',
+          '(C) Option C',
+          '(D) Option D'
+        ],
       };
 
       return result;
@@ -131,9 +129,18 @@ class OCRService {
    */
   async uploadScanImage(imagePath: string, fileName: string): Promise<string> {
     try {
-      const reference = storage().ref(`${STORAGE_PATHS.OCR_SCANS}/${fileName}`);
-      await reference.putFile(imagePath);
-      const downloadUrl = await reference.getDownloadURL();
+      // Fetch the image as a blob
+      const response = await fetch(imagePath);
+      const blob = await response.blob();
+
+      // Create storage reference
+      const storageRef = ref(storage, `${STORAGE_PATHS.OCR_SCANS}/${fileName}`);
+
+      // Upload the blob
+      await uploadBytes(storageRef, blob);
+
+      // Get download URL
+      const downloadUrl = await getDownloadURL(storageRef);
       return downloadUrl;
     } catch (error) {
       console.error('Error uploading scan image:', error);
