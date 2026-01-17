@@ -1,4 +1,19 @@
-import firestore from '@react-native-firebase/firestore';
+import { db } from '../config/firebase.config';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  getDoc,
+  doc,
+  addDoc,
+  updateDoc,
+  setDoc,
+  documentId,
+  Timestamp,
+  limit as firestoreLimit
+} from 'firebase/firestore';
 import { Quiz, Question, QuizAttempt, QuestionAnswer, AnswerOption } from '../types/quiz.types';
 import { COLLECTIONS } from '../config/firebase.config';
 
@@ -8,17 +23,19 @@ class QuizService {
    */
   async getQuizzesBySubject(subjectId: string): Promise<Quiz[]> {
     try {
-      const snapshot = await firestore()
-        .collection(COLLECTIONS.QUIZZES)
-        .where('subjectId', '==', subjectId)
-        .where('isActive', '==', true)
-        .orderBy('createdAt', 'desc')
-        .get();
+      const q = query(
+        collection(db, COLLECTIONS.QUIZZES),
+        where('subjectId', '==', subjectId),
+        where('isActive', '==', true),
+        orderBy('createdAt', 'desc')
+      );
 
-      return snapshot.docs.map(doc => ({
-        ...doc.data(),
-        quizId: doc.id,
-        createdAt: doc.data().createdAt?.toDate(),
+      const snapshot = await getDocs(q);
+
+      return snapshot.docs.map(docSnap => ({
+        ...docSnap.data(),
+        quizId: docSnap.id,
+        createdAt: (docSnap.data().createdAt as Timestamp)?.toDate(),
       })) as Quiz[];
     } catch (error) {
       console.error('Error fetching quizzes:', error);
@@ -42,15 +59,17 @@ class QuizService {
       const allQuestions: Question[] = [];
 
       for (const batch of batches) {
-        const snapshot = await firestore()
-          .collection(COLLECTIONS.QUESTIONS)
-          .where(firestore.FieldPath.documentId(), 'in', batch)
-          .get();
+        const q = query(
+          collection(db, COLLECTIONS.QUESTIONS),
+          where(documentId(), 'in', batch)
+        );
 
-        const questions = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          questionId: doc.id,
-          createdAt: doc.data().createdAt?.toDate(),
+        const snapshot = await getDocs(q);
+
+        const questions = snapshot.docs.map(docSnap => ({
+          ...docSnap.data(),
+          questionId: docSnap.id,
+          createdAt: (docSnap.data().createdAt as Timestamp)?.toDate(),
         })) as Question[];
 
         allQuestions.push(...questions);
@@ -133,13 +152,11 @@ class QuizService {
         answers: questionAnswers,
       };
 
-      const docRef = await firestore()
-        .collection(COLLECTIONS.QUIZ_ATTEMPTS)
-        .add({
-          ...attemptData,
-          startedAt: firestore.Timestamp.fromDate(startTime),
-          completedAt: firestore.Timestamp.fromDate(endTime),
-        });
+      const docRef = await addDoc(collection(db, COLLECTIONS.QUIZ_ATTEMPTS), {
+        ...attemptData,
+        startedAt: Timestamp.fromDate(startTime),
+        completedAt: Timestamp.fromDate(endTime),
+      });
 
       // Update leaderboard
       await this.updateLeaderboard(userId, quiz.subjectId, score, correctAnswers, questions.length);
@@ -165,30 +182,28 @@ class QuizService {
     totalQuestions: number
   ): Promise<void> {
     try {
-      const leaderboardRef = firestore()
-        .collection(COLLECTIONS.LEADERBOARD)
-        .doc(`${userId}_${subjectId}`);
+      const leaderboardRef = doc(db, COLLECTIONS.LEADERBOARD, `${userId}_${subjectId}`);
 
-      const doc = await leaderboardRef.get();
+      const docSnap = await getDoc(leaderboardRef);
 
-      if (doc.exists) {
-        const data = doc.data()!;
+      if (docSnap.exists()) {
+        const data = docSnap.data()!;
         const newTotalAttempts = data.totalAttempts + 1;
         const newTotalCorrect = data.totalCorrect + correctAnswers;
         const newTotalQuestions = data.totalQuestions + totalQuestions;
         const newAverageScore = (newTotalCorrect / newTotalQuestions) * 100;
 
-        await leaderboardRef.update({
+        await updateDoc(leaderboardRef, {
           totalAttempts: newTotalAttempts,
           averageScore: newAverageScore,
           bestScore: Math.max(data.bestScore, score),
           totalCorrect: newTotalCorrect,
           totalQuestions: newTotalQuestions,
-          lastAttemptAt: firestore.FieldValue.serverTimestamp(),
+          lastAttemptAt: new Date(),
         });
       } else {
         // Create new leaderboard entry
-        await leaderboardRef.set({
+        await setDoc(leaderboardRef, {
           leaderboardId: leaderboardRef.id,
           subjectId,
           userId,
@@ -198,7 +213,7 @@ class QuizService {
           bestScore: score,
           totalCorrect: correctAnswers,
           totalQuestions: totalQuestions,
-          lastAttemptAt: firestore.FieldValue.serverTimestamp(),
+          lastAttemptAt: new Date(),
         });
       }
     } catch (error) {
@@ -210,20 +225,22 @@ class QuizService {
   /**
    * Get user's quiz history
    */
-  async getUserQuizHistory(userId: string, limit: number = 20): Promise<QuizAttempt[]> {
+  async getUserQuizHistory(userId: string, limitCount: number = 20): Promise<QuizAttempt[]> {
     try {
-      const snapshot = await firestore()
-        .collection(COLLECTIONS.QUIZ_ATTEMPTS)
-        .where('userId', '==', userId)
-        .orderBy('completedAt', 'desc')
-        .limit(limit)
-        .get();
+      const q = query(
+        collection(db, COLLECTIONS.QUIZ_ATTEMPTS),
+        where('userId', '==', userId),
+        orderBy('completedAt', 'desc'),
+        firestoreLimit(limitCount)
+      );
 
-      return snapshot.docs.map(doc => ({
-        ...doc.data(),
-        attemptId: doc.id,
-        startedAt: doc.data().startedAt?.toDate(),
-        completedAt: doc.data().completedAt?.toDate(),
+      const snapshot = await getDocs(q);
+
+      return snapshot.docs.map(docSnap => ({
+        ...docSnap.data(),
+        attemptId: docSnap.id,
+        startedAt: (docSnap.data().startedAt as Timestamp)?.toDate(),
+        completedAt: (docSnap.data().completedAt as Timestamp)?.toDate(),
       })) as QuizAttempt[];
     } catch (error) {
       console.error('Error fetching quiz history:', error);
