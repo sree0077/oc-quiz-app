@@ -26,6 +26,18 @@ ERROR  Error: Cannot find module 'react-native-reanimated/plugin'
 - Installed `react-native-gesture-handler` (required for navigation)
 - Babel config already had the reanimated plugin configured
 
+### 3. ✅ Missing react-native-worklets (FIXED)
+**Error:**
+```
+ERROR  Error: [BABEL]: Cannot find module 'react-native-worklets/plugin'
+```
+
+**Solution:**
+- Installed `react-native-worklets-core` package
+- Created symlink from `react-native-worklets` to `react-native-worklets-core`
+- Added postinstall script to maintain symlink after npm install
+- This is needed because reanimated@4.1.6 looks for 'react-native-worklets' but the package is named 'react-native-worklets-core'
+
 ## Current Status
 
 ### ✅ All Systems Ready!
@@ -33,8 +45,9 @@ ERROR  Error: Cannot find module 'react-native-reanimated/plugin'
 - **Expo SDK**: 54.0.31 ✅
 - **React**: 19.1.0 ✅
 - **React Native**: 0.81.5 ✅
-- **react-native-reanimated**: 4.0.0 ✅
+- **react-native-reanimated**: 4.1.6 ✅
 - **react-native-gesture-handler**: 2.22.1 ✅
+- **react-native-worklets-core**: 1.6.2 ✅
 - **Metro Bundler**: Starting successfully ✅
 - **No bundling errors**: ✅
 
@@ -63,18 +76,25 @@ npm install --legacy-peer-deps
 
 # Installed missing dependencies
 npx expo install react-native-reanimated react-native-gesture-handler
+
+# Installed worklets-core and created symlink
+npm install react-native-worklets-core --legacy-peer-deps
+cd node_modules && ln -sf react-native-worklets-core react-native-worklets
 ```
 
 ### Files Modified
-- `package.json` - Updated all dependencies to SDK 54
+- `package.json` - Updated all dependencies to SDK 54 + added postinstall script
 - `package-lock.json` - Updated lock file
 - `babel.config.js` - Already had reanimated plugin
+- `node_modules/react-native-worklets` - Symlink to react-native-worklets-core
 
 ### Git Commits
 All changes have been committed and pushed:
 1. Upgrade to Expo SDK 54
 2. Add SDK upgrade documentation
 3. Add react-native-reanimated and gesture-handler
+4. Add react-native-worklets-core dependency
+5. Add postinstall script to fix react-native-worklets symlink
 
 ## Testing
 
