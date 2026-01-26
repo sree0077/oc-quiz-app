@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Platform, TouchableOpacity, Text, Dimensions } from 'react-native';
-import { Button, ProgressBar, useTheme } from 'react-native-paper';
+import { Button, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useQuizStore } from '../../src/store/quizStore';
 import { supabase } from '../../src/config/supabase';
@@ -31,6 +31,10 @@ export default function QuizSessionScreen() {
     console.log('Current question object:', currentQuestion);
     console.log('Current question options:', currentQuestion?.options);
     console.log('Questions length:', questions.length);
+    console.log('Current question text:', currentQuestion?.question_text);
+    console.log('Options array:', currentQuestion?.options);
+    console.log('Is currentQuestion truthy?', !!currentQuestion);
+    console.log('Does currentQuestion have options?', currentQuestion?.options?.length);
 
     if (questions.length === 0) {
       console.log('QuizSession: Store is empty, but session screen is active. This might be a reload.');
@@ -116,57 +120,46 @@ export default function QuizSessionScreen() {
         <Text style={[styles.timerText, timeLeft < 60 && { color: 'red' }]}>{formatTime(timeLeft)}</Text>
       </View>
 
-      <ProgressBar
-        progress={progress}
-        color={theme.colors.primary}
-        style={styles.progressBar}
-      />
-
-      {/* 2. Middle Block: Using a fixed container wrapper to stop web collapse */}
-      <View style={styles.mainScrollWrapper}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          nestedScrollEnabled={true}
-        >
-          {/* Question Title */}
-          <View style={styles.questionBox}>
-            <Text style={styles.questionText}>
-              {currentQuestion.question_text}
-            </Text>
-          </View>
-
-          {/* Options List */}
-          <View style={styles.optionsBox}>
-            {console.log('Rendering', currentQuestion.options?.length, 'options')}
-            {currentQuestion.options && currentQuestion.options.map((option, idx) => {
-              console.log(`Rendering option ${idx}:`, option);
-              return (
-                <TouchableOpacity
-                  key={`opt-${currentQuestion.id}-${idx}`}
-                  onPress={() => submitAnswer(idx)}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.optionBtn,
-                    answers[currentQuestionIndex] === idx && styles.optionBtnSelected
-                  ]}
-                >
-                  <View style={[
-                    styles.radio,
-                    answers[currentQuestionIndex] === idx && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }
-                  ]} />
-                  <Text style={[
-                    styles.optionText,
-                    answers[currentQuestionIndex] === idx && { fontWeight: 'bold' }
-                  ]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+      {/* Custom Progress Bar (react-native-paper ProgressBar has issues on web) */}
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
       </View>
+
+      {/* 2. Middle Block - Scrollable Content */}
+      <ScrollView style={styles.contentWrapper} contentContainerStyle={styles.contentContainer}>
+        {/* Question Title */}
+        <View style={styles.questionBox}>
+          <Text style={styles.questionText}>
+            {currentQuestion.question_text}
+          </Text>
+        </View>
+
+        {/* Options List */}
+        <View style={styles.optionsWrapper}>
+          {currentQuestion.options && currentQuestion.options.map((option, idx) => (
+            <TouchableOpacity
+              key={`opt-${currentQuestion.id}-${idx}`}
+              onPress={() => submitAnswer(idx)}
+              activeOpacity={0.8}
+              style={[
+                styles.optionBtn,
+                answers[currentQuestionIndex] === idx && styles.optionBtnSelected
+              ]}
+            >
+              <View style={[
+                styles.radio,
+                answers[currentQuestionIndex] === idx && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary }
+              ]} />
+              <Text style={[
+                styles.optionText,
+                answers[currentQuestionIndex] === idx && { fontWeight: 'bold' }
+              ]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
       {/* 3. Footer (Always Bottom) */}
       <View style={styles.footer}>
@@ -228,36 +221,44 @@ const styles = StyleSheet.create({
     color: '#d97757',
     fontWeight: 'bold',
   },
-  progressBar: {
+  progressBarContainer: {
     height: 4,
+    width: '100%',
+    backgroundColor: '#e0e0e0',
     flexShrink: 0,
   },
-  mainScrollWrapper: {
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#d97757',
+    transition: 'width 0.3s ease',
+  },
+  contentWrapper: {
     flex: 1,
     width: '100%',
-    minHeight: 0,
   },
-  scrollView: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
+  contentContainer: {
     padding: 20,
-    paddingBottom: 40,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     flexGrow: 1,
   },
   questionBox: {
     paddingVertical: 30,
     paddingHorizontal: 10,
+    width: '100%',
+    maxWidth: 700,
+    alignItems: 'center',
   },
   questionText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#333',
+    color: '#000000',
     lineHeight: 32,
     textAlign: 'center',
   },
-  optionsBox: {
+  optionsWrapper: {
+    width: '100%',
+    maxWidth: 700,
     paddingTop: 10,
   },
   optionBtn: {
@@ -269,12 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#eee',
-    // Shadow for web/ios/android
-    ...Platform.select({
-      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 },
-      android: { elevation: 2 }
-    }),
+    width: '100%',
   },
   optionBtnSelected: {
     borderColor: '#d97757',
