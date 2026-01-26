@@ -17,12 +17,19 @@ end $$;
 -- 3. Enable RLS and setup policies
 alter table public.subjects enable row level security;
 alter table public.questions enable row level security;
+alter table public.quiz_attempts enable row level security;
 
 -- Drop existing policies to avoid errors on retry
 drop policy if exists "Subjects are viewable by everyone." on public.subjects;
 drop policy if exists "Users can insert their own subjects." on public.subjects;
 drop policy if exists "Users can delete own questions." on public.questions;
+drop policy if exists "Leaderboard is viewable by everyone." on public.quiz_attempts;
+drop policy if exists "Users can insert their own quiz attempts." on public.quiz_attempts;
 
 create policy "Subjects are viewable by everyone." on public.subjects for select using (true);
 create policy "Users can insert their own subjects." on public.subjects for insert with check (auth.uid() = creator_id);
 create policy "Users can delete own questions." on public.questions for delete using (auth.uid() = creator_id);
+
+-- Quiz Attempts policies
+create policy "Leaderboard is viewable by everyone." on public.quiz_attempts for select using (true);
+create policy "Users can insert their own quiz attempts." on public.quiz_attempts for insert with check (auth.uid() = user_id);
