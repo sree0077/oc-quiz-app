@@ -1,47 +1,55 @@
-import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, Avatar, Card, Button } from 'react-native-paper';
-import { useAuthStore } from '../../src/store/authStore';
+import { Text, Button, Avatar, List, useTheme, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '../../src/store/authStore';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const theme = useTheme();
   const router = useRouter();
+  const { session, signOut } = useAuthStore();
 
-  const handleLogout = async () => {
-    await logout();
+  const handleSignOut = async () => {
+    await signOut();
     router.replace('/(auth)/login');
   };
 
   return (
-    <View style={styles.container}>
-      <Card style={styles.card}>
-        <Card.Content style={styles.cardContent}>
-          <Avatar.Text
-            size={80}
-            label={user?.displayName?.charAt(0).toUpperCase() || 'U'}
-            style={styles.avatar}
-          />
-          <Text variant="headlineMedium" style={styles.name}>
-            {user?.displayName || 'User'}
-          </Text>
-          <Text variant="bodyMedium" style={styles.email}>
-            {user?.email}
-          </Text>
-          <Text variant="labelLarge" style={styles.role}>
-            {user?.role === 'admin' ? 'Admin' : 'Student'}
-          </Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        <Avatar.Text
+          size={80}
+          label={session?.user?.email?.substring(0, 2).toUpperCase() || 'US'}
+          style={{ backgroundColor: theme.colors.primary }}
+        />
+        <Text variant="headlineSmall" style={styles.name}>
+          {session?.user?.email}
+        </Text>
+        <Text variant="bodyMedium" style={styles.role}>Student</Text>
+      </View>
 
-          <Button
-            mode="contained"
-            onPress={handleLogout}
-            style={styles.logoutButton}
-            icon="logout"
-          >
-            Logout
-          </Button>
-        </Card.Content>
-      </Card>
+      <View style={styles.section}>
+        <List.Section>
+          <List.Subheader>Account</List.Subheader>
+          <List.Item
+            title="Edit Profile"
+            left={props => <List.Icon {...props} icon="account-edit" />}
+            onPress={() => { }}
+          />
+          <Divider />
+          <List.Item
+            title="Notifications"
+            left={props => <List.Icon {...props} icon="bell" />}
+            onPress={() => { }}
+          />
+          <Divider />
+          <List.Item
+            title="Sign Out"
+            left={props => <List.Icon {...props} icon="logout" color={theme.colors.error} />}
+            titleStyle={{ color: theme.colors.error }}
+            onPress={handleSignOut}
+          />
+        </List.Section>
+      </View>
     </View>
   );
 }
@@ -49,36 +57,19 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
   },
-  card: {
-    elevation: 4,
-  },
-  cardContent: {
+  header: {
     alignItems: 'center',
-    padding: 24,
-  },
-  avatar: {
-    backgroundColor: '#1976D2',
-    marginBottom: 16,
+    paddingVertical: 32,
   },
   name: {
+    marginTop: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  email: {
-    color: '#757575',
-    marginBottom: 8,
   },
   role: {
-    color: '#1976D2',
-    marginBottom: 24,
-    textTransform: 'uppercase',
+    opacity: 0.6,
   },
-  logoutButton: {
-    marginTop: 16,
-    paddingHorizontal: 32,
+  section: {
+    paddingHorizontal: 16,
   },
 });
-

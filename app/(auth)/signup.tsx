@@ -1,205 +1,129 @@
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
-import {
-  TextInput,
-  Button,
-  Text,
-  Card,
-  HelperText,
-  SegmentedButtons,
-} from 'react-native-paper';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../src/store/authStore';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, TextInput, Button, HelperText, useTheme } from 'react-native-paper';
+import { Link, useRouter } from 'expo-router';
+import { supabase } from '../../src/config/supabase';
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { signup, isLoading, error } = useAuthStore();
-
-  const [name, setName] = useState('');
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'admin'>('student');
-  const [showPassword, setShowPassword] = useState(false);
-  const [validationError, setValidationError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSignup = async () => {
-    // Validation
-    if (!name || !email || !password || !confirmPassword) {
-      setValidationError('All fields are required');
-      return;
-    }
-
-    if (password.length < 6) {
-      setValidationError('Password must be at least 6 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setValidationError('Passwords do not match');
-      return;
-    }
-
-    setValidationError('');
+    setLoading(true);
+    setError('');
 
     try {
-      await signup(email, password, name, role);
-      router.replace('/(tabs)/dashboard');
-    } catch (err) {
-      // Error is handled by the store
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      // Auto login or redirect to login (Supabase default behavior might require email confirm)
+      // For now, assume auto-login or just redirect to tell user to check email if needed
+      // But typically signUp signs you in if email confirmation is disabled. 
+      // If enabled, it returns session null.
+
+      alert('Account created! Please check your email if confirmation is required.');
+      router.replace('/(auth)/login');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during signup');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          <Text variant="headlineLarge" style={styles.title}>
-            Create Account
-          </Text>
-          <Text variant="titleMedium" style={styles.subtitle}>
-            Join OC Quiz App
-          </Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.content}>
+        <Text variant="displayMedium" style={[styles.title, { color: theme.colors.primary }]}>
+          Create Account
+        </Text>
 
-          <Card style={styles.card}>
-            <Card.Content>
-              <TextInput
-                label="Full Name"
-                value={name}
-                onChangeText={setName}
-                mode="outlined"
-                style={styles.input}
-              />
+        <TextInput
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          mode="outlined"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={styles.input}
+        />
 
-              <TextInput
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                mode="outlined"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.input}
-              />
+        <TextInput
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          mode="outlined"
+          secureTextEntry
+          style={styles.input}
+        />
 
-              <TextInput
-                label="Password"
-                value={password}
-                onChangeText={setPassword}
-                mode="outlined"
-                secureTextEntry={!showPassword}
-                right={
-                  <TextInput.Icon
-                    icon={showPassword ? 'eye-off' : 'eye'}
-                    onPress={() => setShowPassword(!showPassword)}
-                  />
-                }
-                style={styles.input}
-              />
+        {error ? (
+          <HelperText type="error" visible={!!error}>
+            {error}
+          </HelperText>
+        ) : null}
 
-              <TextInput
-                label="Confirm Password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                mode="outlined"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-              />
+        <Button
+          mode="contained"
+          onPress={handleSignup}
+          loading={loading}
+          disabled={loading}
+          style={styles.button}
+          contentStyle={styles.buttonContent}
+        >
+          Sign Up
+        </Button>
 
-              <Text variant="labelLarge" style={styles.roleLabel}>
-                I am a:
+        <View style={styles.footer}>
+          <Text variant="bodyMedium">Already have an account? </Text>
+          <Link href="/(auth)/login" asChild>
+            <TouchableOpacity>
+              <Text variant="bodyMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+                Login
               </Text>
-              <SegmentedButtons
-                value={role}
-                onValueChange={(value) => setRole(value as 'student' | 'admin')}
-                buttons={[
-                  { value: 'student', label: 'Student' },
-                  { value: 'admin', label: 'Admin' },
-                ]}
-                style={styles.segmentedButtons}
-              />
-
-              {(validationError || error) && (
-                <HelperText type="error" visible={!!(validationError || error)}>
-                  {validationError || error}
-                </HelperText>
-              )}
-
-              <Button
-                mode="contained"
-                onPress={handleSignup}
-                loading={isLoading}
-                disabled={isLoading}
-                style={styles.button}
-              >
-                Sign Up
-              </Button>
-
-              <Button
-                mode="text"
-                onPress={() => router.back()}
-                style={styles.linkButton}
-              >
-                Already have an account? Login
-              </Button>
-            </Card.Content>
-          </Card>
+            </TouchableOpacity>
+          </Link>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1976D2',
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
     justifyContent: 'center',
     padding: 20,
   },
+  content: {
+    maxWidth: 400,
+    width: '100%',
+    alignSelf: 'center',
+  },
   title: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 8,
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    color: '#fff',
-    textAlign: 'center',
     marginBottom: 32,
-  },
-  card: {
-    elevation: 4,
+    textAlign: 'center',
   },
   input: {
     marginBottom: 16,
   },
-  roleLabel: {
-    marginBottom: 8,
-  },
-  segmentedButtons: {
-    marginBottom: 16,
-  },
   button: {
     marginTop: 8,
+    borderRadius: 8,
+  },
+  buttonContent: {
     paddingVertical: 6,
   },
-  linkButton: {
-    marginTop: 8,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 24,
   },
 });
-

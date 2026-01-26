@@ -1,2 +1,0 @@
-This is a placeholder. Replace with actual 1024x1024 PNG icon.
-For now, we'll remove the icon requirement from app.json.

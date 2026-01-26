@@ -1,75 +1,91 @@
 import { create } from 'zustand';
-import { Quiz, Question, QuizState, AnswerOption } from '../types/quiz.types';
 
-interface QuizStore extends QuizState {
-  setQuiz: (quiz: Quiz, questions: Question[]) => void;
-  setAnswer: (questionId: string, answer: AnswerOption) => void;
+export type Question = {
+  id: string;
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  category: string;
+};
+
+interface QuizState {
+  questions: Question[];
+  currentQuestionIndex: number;
+  answers: number[]; // Index of selected option for each question (-1 if skipped)
+  score: number;
+  startTime: number | null;
+  endTime: number | null;
+
+  startQuiz: (questions: Question[]) => void;
+  submitAnswer: (answerIndex: number) => void;
   nextQuestion: () => void;
-  previousQuestion: () => void;
-  goToQuestion: (index: number) => void;
-  updateTimeRemaining: (time: number) => void;
-  submitQuiz: () => void;
+  prevQuestion: () => void;
+  finishQuiz: () => void;
   resetQuiz: () => void;
 }
 
-export const useQuizStore = create<QuizStore>((set, get) => ({
-  currentQuiz: null,
+export const useQuizStore = create<QuizState>((set, get) => ({
   questions: [],
   currentQuestionIndex: 0,
-  answers: new Map(),
-  timeRemaining: 0,
-  isSubmitted: false,
+  answers: [],
+  score: 0,
+  startTime: null,
+  endTime: null,
 
-  setQuiz: (quiz, questions) =>
+  startQuiz: (questions) => {
+    console.log('QuizStore.startQuiz called with questions:', questions);
+    console.log('Questions count:', questions.length);
     set({
-      currentQuiz: quiz,
       questions,
       currentQuestionIndex: 0,
-      answers: new Map(),
-      timeRemaining: quiz.duration * 60, // Convert minutes to seconds
-      isSubmitted: false,
-    }),
+      answers: new Array(questions.length).fill(-1),
+      score: 0,
+      startTime: Date.now(),
+      endTime: null,
+    });
+    console.log('QuizStore state updated');
+  },
 
-  setAnswer: (questionId, answer) =>
-    set((state) => {
-      const newAnswers = new Map(state.answers);
-      newAnswers.set(questionId, answer);
-      return { answers: newAnswers };
-    }),
+  submitAnswer: (answerIndex) => {
+    const { answers, currentQuestionIndex } = get();
+    const newAnswers = [...answers];
+    newAnswers[currentQuestionIndex] = answerIndex;
+    set({ answers: newAnswers });
+  },
 
-  nextQuestion: () =>
-    set((state) => ({
-      currentQuestionIndex: Math.min(
-        state.currentQuestionIndex + 1,
-        state.questions.length - 1
-      ),
-    })),
+  nextQuestion: () => {
+    const { currentQuestionIndex, questions } = get();
+    if (currentQuestionIndex < questions.length - 1) {
+      set({ currentQuestionIndex: currentQuestionIndex + 1 });
+    }
+  },
 
-  previousQuestion: () =>
-    set((state) => ({
-      currentQuestionIndex: Math.max(state.currentQuestionIndex - 1, 0),
-    })),
+  prevQuestion: () => {
+    const { currentQuestionIndex } = get();
+    if (currentQuestionIndex > 0) {
+      set({ currentQuestionIndex: currentQuestionIndex - 1 });
+    }
+  },
 
-  goToQuestion: (index) =>
-    set((state) => ({
-      currentQuestionIndex: Math.max(
-        0,
-        Math.min(index, state.questions.length - 1)
-      ),
-    })),
+  finishQuiz: () => {
+    const { questions, answers } = get();
+    let score = 0;
+    questions.forEach((q, index) => {
+      if (answers[index] === q.correct_option_index) {
+        score++;
+      }
+    });
+    set({ score, endTime: Date.now() });
+  },
 
-  updateTimeRemaining: (time) => set({ timeRemaining: time }),
-
-  submitQuiz: () => set({ isSubmitted: true }),
-
-  resetQuiz: () =>
+  resetQuiz: () => {
     set({
-      currentQuiz: null,
       questions: [],
       currentQuestionIndex: 0,
-      answers: new Map(),
-      timeRemaining: 0,
-      isSubmitted: false,
-    }),
+      answers: [],
+      score: 0,
+      startTime: null,
+      endTime: null,
+    });
+  },
 }));
-
