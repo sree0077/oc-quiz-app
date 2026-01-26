@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, TextInput, Button, RadioButton, HelperText, useTheme, ActivityIndicator, Dialog, Portal } from 'react-native-paper';
+import { Text, TextInput, Button, RadioButton, HelperText, useTheme, ActivityIndicator, Dialog, Portal, Menu, List } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../src/config/supabase';
 import { useAuthStore } from '../../src/store/authStore';
 import { parseExcelFile, performOCR, parseQuestionsFromText, ParsedQuestion } from '../../src/utils/documentParser';
+import { Subject } from '../../src/store/quizStore';
 
 export default function CreateQuestionScreen() {
   const theme = useTheme();
@@ -20,15 +21,37 @@ export default function CreateQuestionScreen() {
   const [option4, setOption4] = useState('');
   const [correctOption, setCorrectOption] = useState<string>('0');
   const [category, setCategory] = useState('');
+  const [subjectName, setSubjectName] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectMenuVisible, setSubjectMenuVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [subjectLoading, setSubjectLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showMultiQuestionDialog, setShowMultiQuestionDialog] = useState(false);
   const [detectedQuestions, setDetectedQuestions] = useState<ParsedQuestion[]>([]);
 
+  const fetchSubjects = async () => {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .order('name');
+    if (!error && data) {
+      setSubjects(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubjects();
+  }, []);
+
   const handleCreate = async () => {
-    console.log('handleCreate called');
+    console.log('handleCreate called, loading state:', loading);
+    if (loading) return;
+
     if (!questionText || !option1 || !option2 || !option3 || !option4) {
       Alert.alert('Missing Fields', 'Please fill all fields.');
       console.log('Missing fields validation failed');
@@ -37,6 +60,30 @@ export default function CreateQuestionScreen() {
 
     console.log('Preparing to save question...');
     setLoading(true);
+
+    let finalSubjectId = selectedSubjectId;
+
+    // If manual subject name is provided, check if it exists or create it
+    if (subjectName.trim()) {
+      const existing = subjects.find(s => s.name.toLowerCase() === subjectName.trim().toLowerCase());
+      if (existing) {
+        finalSubjectId = existing.id;
+      } else {
+        // Create new subject
+        const { data, error: subError } = await supabase
+          .from('subjects')
+          .insert({ name: subjectName.trim(), creator_id: session?.user.id })
+          .select()
+          .single();
+
+        if (!subError && data) {
+          finalSubjectId = data.id;
+          // Optimistically update subjects list
+          setSubjects(prev => [...prev, data]);
+        }
+      }
+    }
+
     const options = [option1, option2, option3, option4];
 
     const questionData = {
@@ -45,6 +92,7 @@ export default function CreateQuestionScreen() {
       options: options,
       correct_option_index: parseInt(correctOption),
       category: category || 'General',
+      subject_id: finalSubjectId,
     };
 
     console.log('Question data:', questionData);
@@ -62,6 +110,8 @@ export default function CreateQuestionScreen() {
       setQuestionText('');
       setOption1(''); setOption2(''); setOption3(''); setOption4('');
       setCorrectOption('0');
+      setSubjectName('');
+      setSelectedSubjectId(null);
     } else {
       console.error('Save error:', error);
       Alert.alert('Error', error.message || 'Failed to save question');
@@ -93,7 +143,8 @@ export default function CreateQuestionScreen() {
         question_text: q.question_text,
         options: q.options,
         correct_option_index: q.correct_option_index,
-        category: q.category
+        category: q.category,
+        subject_id: selectedSubjectId
       }));
 
       const { error } = await supabase.from('questions').insert(toInsert);
@@ -188,7 +239,8 @@ export default function CreateQuestionScreen() {
       question_text: q.question_text,
       options: q.options,
       correct_option_index: 0,
-      category: category || 'General'
+      category: category || 'General',
+      subject_id: selectedSubjectId
     }));
 
     const { error } = await supabase.from('questions').insert(toInsert);
@@ -246,13 +298,52 @@ export default function CreateQuestionScreen() {
         {ocrLoading && <ActivityIndicator size="small" style={{ alignSelf: 'flex-start', marginBottom: 8 }} />}
       </View>
 
-      <TextInput
-        label="Category (e.g. Math, History)"
-        value={category}
-        onChangeText={setCategory}
-        mode="outlined"
-        style={styles.input}
-      />
+      <View style={styles.subjectContainer}>
+        <View style={{ flex: 1 }}>
+          <TextInput
+            label="Subject"
+            value={subjectName}
+            onChangeText={(text) => {
+              setSubjectName(text);
+              setSelectedSubjectId(null);
+            }}
+            mode="outlined"
+            right={
+              <TextInput.Icon
+                icon="chevron-down"
+                onPress={() => setSubjectMenuVisible(true)}
+              />
+            }
+          />
+          <Menu
+            visible={subjectMenuVisible}
+            onDismiss={() => setSubjectMenuVisible(false)}
+            anchor={{ x: 0, y: 0 }} // Anchor is handled by the manual input icon
+            contentStyle={{ marginTop: 60 }}
+          >
+            {subjects.map(subject => (
+              <Menu.Item
+                key={subject.id}
+                onPress={() => {
+                  setSubjectName(subject.name);
+                  setSelectedSubjectId(subject.id);
+                  setSubjectMenuVisible(false);
+                }}
+                title={subject.name}
+              />
+            ))}
+            {subjects.length === 0 && <Menu.Item title="No subjects found" disabled />}
+          </Menu>
+        </View>
+
+        <TextInput
+          label="Category"
+          value={category}
+          onChangeText={setCategory}
+          mode="outlined"
+          style={[styles.input, { flex: 1, marginLeft: 8 }]}
+        />
+      </View>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>Options (Select the correct answer)</Text>
 
@@ -336,6 +427,16 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     position: 'relative',
+  },
+  subjectContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  subjectButton: {
+    flex: 1,
+    height: 56,
+    justifyContent: 'center',
   },
   optionRow: {
     flexDirection: 'row',

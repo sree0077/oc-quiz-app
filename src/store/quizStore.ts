@@ -1,11 +1,18 @@
 import { create } from 'zustand';
 
+export type Subject = {
+  id: string;
+  name: string;
+  creator_id: string;
+};
+
 export type Question = {
   id: string;
   question_text: string;
   options: string[];
   correct_option_index: number;
   category: string;
+  subject_id?: string;
 };
 
 interface QuizState {
